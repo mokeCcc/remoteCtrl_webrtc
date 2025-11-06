@@ -11,7 +11,7 @@
 
 
 // The one and only application object
-// branch 002 
+// branch main
 CWinApp theApp;
 
 using namespace std;
