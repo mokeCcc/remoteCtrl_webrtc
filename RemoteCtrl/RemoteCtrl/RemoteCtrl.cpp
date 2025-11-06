@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "framework.h"
 #include "RemoteCtrl.h"
+#include "CServerSocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -14,14 +15,13 @@
 // branch main
 CWinApp theApp;
 
-using namespace std;
 
 int main()
 {
     int nRetCode = 0;
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
-
+    
     if (hModule != nullptr)
     {
         // initialize MFC and print and error on failure
@@ -33,7 +33,21 @@ int main()
         }
         else
         {
-            // TODO: code your application's behavior here.
+       
+            CServerSocket* pserver = CServerSocket::getInstance();
+            int count = 0;
+            if (!pserver->InitializeSocket()) {
+                MessageBox(NULL, _T("network initialized error!"), _T("network  initialized error!"), MB_OK | MB_ICONERROR);
+                exit(0);
+            }
+            while (CServerSocket::getInstance() != NULL) {
+                if (pserver->AcceptClient() == false) {
+                    if (count >= 3) exit(0);
+                    MessageBox(NULL, _T("can not accept client,reagian!"), _T("accept client error"), MB_OK | MB_ICONERROR);
+                    count++;
+                }
+                int ret = pserver->DealCommand();
+            }
         }
     }
     else
