@@ -9,12 +9,17 @@ class CPacket
 {
 public:
 	CPacket() :wdHead(0), dwLength(0), wdCmd(0), wdSumCheck(0) {}
-	CPacket(WORD nCmd,const BYTE* pData, unsigned int  nSize){
+	CPacket(WORD nCmd, const BYTE* pData, unsigned int  nSize) {
 		wdHead = 0xfeff;
 		dwLength = nSize + 4;
 		wdCmd = nCmd;
-		strData.resize(nSize);
-		memcpy((void*)strData.c_str(), pData, nSize);
+		if (nSize > 0){
+			strData.resize(nSize);
+			memcpy((void*)strData.c_str(), pData, nSize);
+		}
+		else {
+			strData.clear();
+		}
 		wdSumCheck = 0;
 		for (unsigned int  j = 0;j<strData.size();j++){
 			wdSumCheck += (BYTE)(strData[j]) &0xff;
@@ -162,7 +167,7 @@ public:
 
 	}
 	bool GetFilePath(std::string& strPath) {
-		if (m_packet.wdCmd == 2) {
+		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4)) {
 			strPath = m_packet.strData;
 			return true;
 		}
