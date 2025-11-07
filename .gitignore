@@ -45,3 +45,4 @@ RemoteCtrl/RemoteCtrl/RemoteCtrl.vcxproj.user
 RemoteCtrl/RemoteCtrl/x64/
 RemoteCtrl/RemoteClient/x64/
 
+*.tlog

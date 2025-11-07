@@ -5,6 +5,9 @@
 #include "framework.h"
 #include "RemoteCtrl.h"
 #include "CServerSocket.h"
+#include <list>
+#include <io.h>
+#include <stdio.h>
 #include <direct.h>
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -25,7 +28,7 @@ VOID Dump(BYTE* pData, unsigned int  nSize) {
     strOut += "\n";
     OutputDebugStringA(strOut.c_str());
 }
-std::string MakeDriverInfo() {
+int  MakeDriverInfo() {
    std::string res;
    for (int i = 1; i< 26; i++)
    {
@@ -37,7 +40,57 @@ std::string MakeDriverInfo() {
    CPacket packet(1, (BYTE*)res.c_str(), res.size());
    Dump((BYTE*)packet.Data(), packet.Size());
   // CServerSocket::getInstance()->Send(packet);
-   return 0;
+   return 1;
+}
+typedef struct file_info{
+    file_info() {
+        IsInvalid = false;
+        IsDirectory = -1;
+        hasNext = true;
+        memset(szFileName, 0, sizeof(szFileName));
+    }
+    bool IsInvalid; // invalid
+    bool hasNext;
+    char szFileName[256]; //file name
+    bool IsDirectory;   //directory or file
+}FILEINFO,*PFINEINFO;
+
+int MakeDirectoryInfo() {
+    std::string strPath;
+  //  std::list<FILEINFO> lstFileInfos;
+    if (!CServerSocket::getInstance()->GetFilePath(strPath)) return -1;  //command phrase error
+    if (_chdir(strPath.c_str()) != 0) { 
+        FILEINFO finfo;
+        finfo.IsInvalid = true;
+        finfo.IsDirectory = true;
+        finfo.hasNext = false;
+        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+       // lstFileInfos.push_back(finfo);
+        CPacket pack(2,(BYTE*) & finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
+        return -2;
+    }// can not to access dir
+    _finddata_t fdata;
+    int hfind = 0;
+    if ((hfind = _findfirst("*", &fdata))== -1) {
+        OutputDebugString(_T("can not find any file"));
+        return -3;
+    }
+    do {
+        FILEINFO finfo; 
+        finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+       // finfo.IsInvalid = false;
+        memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
+      //  lstFileInfos.push_back(finfo);
+    } while (!_findnext(hfind,&fdata));
+
+    FILEINFO finfo;
+    finfo.hasNext = false;
+	CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+	CServerSocket::getInstance()->Send(pack);
+    return 0;
 }
 int main()
 {
@@ -77,6 +130,9 @@ int main()
             case 1:
                 MakeDriverInfo();
             	break;
+            case 2:
+                MakeDirectoryInfo();
+                break;
             }
             
         }

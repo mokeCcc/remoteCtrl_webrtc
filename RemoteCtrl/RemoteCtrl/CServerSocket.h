@@ -37,9 +37,10 @@ public:
 		*(DWORD*)(pData + 2) = dwLength;	// 09 00 00 00
 		*(WORD*)(pData + 6) = wdCmd;		// 01 00
 		memcpy(pData + 8, strData.c_str(), strData.size()); // 43 2C 44 2C 45
-		*(WORD*)(pData + 8 + strData.size()) = wdSumCheck; // 24 01 
+		*(WORD*)(pData + 8 + strData.size()) = wdSumCheck; // 
 		return strOut.c_str();
 	}
+	 
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack){
 			wdHead = pack.wdHead;
@@ -159,6 +160,13 @@ public:
 		if (m_client == -1) return false;
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
 
+	}
+	bool GetFilePath(std::string& strPath) {
+		if (m_packet.wdCmd == 2) {
+			strPath = m_packet.strData;
+			return true;
+		}
+		return false;
 	}
 private:
 	
