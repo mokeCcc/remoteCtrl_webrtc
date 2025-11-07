@@ -3,13 +3,23 @@
 //#include "framework.h"
 
 
-
-
+#pragma pack(push)
+#pragma pack(1)
 class CPacket
 {
 public:
 	CPacket() :wdHead(0), dwLength(0), wdCmd(0), wdSumCheck(0) {}
-
+	CPacket(WORD nCmd,const BYTE* pData, unsigned int  nSize){
+		wdHead = 0xfeff;
+		dwLength = nSize + 4;
+		wdCmd = nCmd;
+		strData.resize(nSize);
+		memcpy((void*)strData.c_str(), pData, nSize);
+		wdSumCheck = 0;
+		for (unsigned int  j = 0;j<strData.size();j++){
+			wdSumCheck += (BYTE)(strData[j]) &0xff;
+		}
+	}
 	CPacket(const CPacket& pack) {
 		wdHead = pack.wdHead;
 		dwLength = pack.dwLength;
@@ -17,7 +27,19 @@ public:
 		strData = pack.strData;
 		wdSumCheck = pack.wdSumCheck;
 	}
-
+	int Size() {
+		return dwLength + 6;
+	}
+	const char* Data() { // FF FE 09 00 00 00 01 00 43 2C 44 2C 45 24 01 
+		strOut.resize(dwLength + 6);
+		BYTE* pData = (BYTE*)strOut.c_str(); 
+		*(WORD*)pData = wdHead;				// FF FE 
+		*(DWORD*)(pData + 2) = dwLength;	// 09 00 00 00
+		*(WORD*)(pData + 6) = wdCmd;		// 01 00
+		memcpy(pData + 8, strData.c_str(), strData.size()); // 43 2C 44 2C 45
+		*(WORD*)(pData + 8 + strData.size()) = wdSumCheck; // 24 01 
+		return strOut.c_str();
+	}
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack){
 			wdHead = pack.wdHead;
@@ -28,8 +50,8 @@ public:
 		}
 		return *this;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {
-		size_t i;
+	CPacket(const BYTE* pData, unsigned int& nSize) {
+		unsigned int  i;
 		for (i = 0; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {
 				wdHead = *(WORD*)(pData + i);
@@ -51,9 +73,9 @@ public:
 			i += dwLength - 4;
 		}
 		wdSumCheck = *(WORD*)(pData + i); i += 2;
-		for (size_t j =0; j<strData.size();j++)
+		for (unsigned int j =0; j < strData.size();j++)
 		{
-			wdSumCheck -= BYTE(strData[i]) & 0xff;
+			wdSumCheck -= BYTE(strData[j]) & 0xff;
 		}
 		if (wdSumCheck == 0) {
 			nSize = i;  // length4  head 2 a and data
@@ -68,10 +90,10 @@ public:
 	WORD  wdCmd;		  // packet command
 	std::string strData;  // packet data 
 	WORD wdSumCheck;
-
+	std::string strOut;
 private:
 };
-
+#pragma  pack (pop)
 
 
 class CServerSocket
@@ -111,9 +133,9 @@ public:
 		//char buffer[1024] = {};
 		char* buffer = new char[BUFFER_SIZE];
 		memset(buffer, 0, BUFFER_SIZE);
-		size_t idx = 0;
+		unsigned int  idx = 0;
 		while (true) {
-			size_t len = recv(m_sock, buffer + idx, BUFFER_SIZE - idx, 0);
+			unsigned int  len = recv(m_sock, buffer + idx, BUFFER_SIZE - idx, 0);
 			if (len <= 0) return -1;
 			idx += len;
 			len = idx;
@@ -131,6 +153,11 @@ public:
 	bool Send(const char* pData, int nSize) {
 		if (m_client == -1) return false;
 		return send(m_client, pData, nSize, 0) > 0;
+
+	}
+	bool Send( CPacket& pack) {
+		if (m_client == -1) return false;
+		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
 
 	}
 private:
