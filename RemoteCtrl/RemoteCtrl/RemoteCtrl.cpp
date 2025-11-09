@@ -7,6 +7,7 @@
 #include "CServerSocket.h"
 #include <list>
 #include <io.h>
+#include <atlimage.h> 
 #include <stdio.h>
 #include <direct.h>
 #ifdef _DEBUG
@@ -55,6 +56,40 @@ typedef struct file_info{
     bool IsDirectory;   //directory or file
 }FILEINFO,*PFINEINFO;
 
+int SendScreen() {
+    // TODO: multi screen 
+    CImage  screen;
+    HDC hScreen = GetDC(NULL);
+    int nWidth = GetSystemMetrics(SM_CXSCREEN);
+    int nHeight = GetSystemMetrics(SM_CYSCREEN);
+    int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);
+
+    screen.Create(nWidth, nHeight, nBitPerPixel);
+    HDC hImgScreen = screen.GetDC();
+    BitBlt(hImgScreen, 0, 0, nWidth, nHeight, hScreen, 0, 0, SRCCOPY);
+    IStream* pStream = nullptr;
+   
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+    if (hMem == NULL) return -1;
+
+    HRESULT hr = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+    if (FAILED(hr)) return -2;
+    screen.Save(pStream, Gdiplus::ImageFormatJPEG);
+    //screen.Save(_T("TEST20125.jpg"), Gdiplus::ImageFormatJPEG);
+    LARGE_INTEGER liZero = { 0 };
+    pStream->Seek(liZero, STREAM_SEEK_SET, nullptr);
+    PBYTE pData = (PBYTE)GlobalLock(hMem);
+    SIZE_T nSz = GlobalSize(hMem);
+    CPacket pack(5, pData, nSz);
+    CServerSocket::getInstance()->Send(pack);
+    //Dump(pData, nSz);
+
+    GlobalUnlock(hMem);
+    pStream->Release();
+    ReleaseDC(NULL, hScreen);
+    screen.ReleaseDC();
+    return 0;
+}
 int MakeDirectoryInfo() {
     std::string strPath;
   //  std::list<FILEINFO> lstFileInfos;
@@ -128,6 +163,13 @@ int DownloadFile() {
     fclose(pFile);
     return 0;
 }
+int LockMachine() {
+    return 0;
+}
+int UnlockMachine() {
+    return 0;
+
+}
 int main()
 {
     int nRetCode = 0;
@@ -160,7 +202,7 @@ int main()
                 }
                 int ret = pserver->DealCommand();
             }*/
-            int Cmd = 1;
+            int Cmd = 5;
             switch (Cmd)
             {
             case 1:
@@ -175,7 +217,18 @@ int main()
             case 4:
                 DownloadFile();
                 break;
+            case 5:
+                SendScreen();
+                break;
+            case 6:
+                LockMachine();
+                break;
+            case 7:
+                UnlockMachine();
+                break;
+
             }
+           
             
         }
     }
