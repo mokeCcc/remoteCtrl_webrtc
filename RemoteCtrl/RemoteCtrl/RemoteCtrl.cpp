@@ -170,6 +170,36 @@ int UnlockMachine() {
     return 0;
 
 }
+
+int ExcuteCommand(WORD nCmd) {
+    int ret = 0;
+    switch (nCmd)
+    {
+    case 1:
+        ret = MakeDriverInfo();
+        break;
+    case 2:
+        ret = MakeDirectoryInfo();
+        break;
+    case 3:
+        ret = RunFile();
+        break;
+    case 4:
+        ret = DownloadFile();
+        break;
+    case 5:
+        ret = SendScreen();
+        break;
+    case 6:
+        ret = LockMachine();
+        break;
+    case 7:
+        ret = UnlockMachine();
+        break;
+    }
+
+    return ret;
+}
 int main()
 {
     int nRetCode = 0;
@@ -187,7 +217,7 @@ int main()
         }
         else
         {
-             /*
+             
             CServerSocket* pserver = CServerSocket::getInstance();
             int count = 0;
             if (!pserver->InitializeSocket()) {
@@ -201,33 +231,17 @@ int main()
                     count++;
                 }
                 int ret = pserver->DealCommand();
-            }*/
-            int Cmd = 5;
-            switch (Cmd)
-            {
-            case 1:
-                MakeDriverInfo();
-            	break;
-            case 2:
-                MakeDirectoryInfo();
-                break;
-            case 3:
-                RunFile();
-                break;
-            case 4:
-                DownloadFile();
-                break;
-            case 5:
-                SendScreen();
-                break;
-            case 6:
-                LockMachine();
-                break;
-            case 7:
-                UnlockMachine();
-                break;
+                if( ret == 0) {
 
+                   ret = ExcuteCommand(pserver->GetPacket().wdCmd);
+                   if( ret != 0) {
+                       TRACE("Excute Command error %d ret = %d", pserver->GetPacket().wdCmd, ret);
+                   }
+                   pserver->CloseClient();
+                 }
+               
             }
+           
            
             
         }

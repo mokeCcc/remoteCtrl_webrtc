@@ -1,8 +1,5 @@
 #pragma once
-#include "pch.h"
-//#include "framework.h"
-
-
+#include <string> 
 #pragma pack(push)
 #pragma pack(1)
 class CPacket
@@ -13,7 +10,7 @@ public:
 		wdHead = 0xfeff;
 		dwLength = nSize + 4;
 		wdCmd = nCmd;
-		if (nSize > 0){
+		if (nSize > 0) {
 			strData.resize(nSize);
 			memcpy((void*)strData.c_str(), pData, nSize);
 		}
@@ -21,8 +18,8 @@ public:
 			strData.clear();
 		}
 		wdSumCheck = 0;
-		for (unsigned int  j = 0;j<strData.size();j++){
-			wdSumCheck += (BYTE)(strData[j]) &0xff;
+		for (unsigned int j = 0; j < strData.size(); j++) {
+			wdSumCheck += (BYTE)(strData[j]) & 0xff;
 		}
 	}
 	CPacket(const CPacket& pack) {
@@ -37,7 +34,7 @@ public:
 	}
 	const char* Data() { // FF FE 09 00 00 00 01 00 43 2C 44 2C 45 24 01 
 		strOut.resize(dwLength + 6);
-		BYTE* pData = (BYTE*)strOut.c_str(); 
+		BYTE* pData = (BYTE*)strOut.c_str();
 		*(WORD*)pData = wdHead;				// FF FE 
 		*(DWORD*)(pData + 2) = dwLength;	// 09 00 00 00
 		*(WORD*)(pData + 6) = wdCmd;		// 01 00
@@ -45,9 +42,9 @@ public:
 		*(WORD*)(pData + 8 + strData.size()) = wdSumCheck; // 
 		return strOut.c_str();
 	}
-	 
+
 	CPacket& operator=(const CPacket& pack) {
-		if (this != &pack){
+		if (this != &pack) {
 			wdHead = pack.wdHead;
 			dwLength = pack.dwLength;
 			wdCmd = pack.wdCmd;
@@ -79,7 +76,7 @@ public:
 			i += dwLength - 4;
 		}
 		wdSumCheck = *(WORD*)(pData + i); i += 2;
-		for (unsigned int j =0; j < strData.size();j++)
+		for (unsigned int j = 0; j < strData.size(); j++)
 		{
 			wdSumCheck -= BYTE(strData[j]) & 0xff;
 		}
@@ -89,7 +86,7 @@ public:
 		}
 		nSize = 0;
 	}
-	~CPacket(){}
+	~CPacket() {}
 
 	WORD wdHead;		  //fix bytes FE FF
 	DWORD dwLength;		  //packet length( packet command and data)
@@ -102,40 +99,42 @@ private:
 #pragma  pack (pop)
 
 
-class CServerSocket
+std::string GetwsaErrInfo(int wsaErrorCode);
+
+
+class CClientSocket
 {
 public:
-	static CServerSocket* getInstance() {
-		if (!m_instance) { m_instance = new CServerSocket(); }
+	static CClientSocket* getInstance() {
+		if (!m_instance) { m_instance = new CClientSocket(); }
 		return m_instance;
 	}
 
-	bool InitializeSocket() {
+	bool InitializeSocket(const std::string strIPAddress) {
 		if (m_sock == -1) return false;
 		// TODO: check socket value
 		sockaddr_in serv_addr;
 		memset(&serv_addr, 0, sizeof(serv_addr));
 		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_addr.s_addr = INADDR_ANY; // listen all ip address
+		serv_addr.sin_addr.s_addr = inet_addr(strIPAddress.c_str()); 
 		serv_addr.sin_port = htons(8086);
-
-		if (bind(m_sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) return false;
-		if (listen(m_sock, 1) == -1) return false;
-
+		if (serv_addr.sin_addr.s_addr == INADDR_NONE) {
+			AfxMessageBox("IP dont exsit!");
+			return false;
+		}
+		int ret = connect(m_sock, (sockaddr*)&serv_addr, sizeof serv_addr);
+		if (ret == -1) {
+			AfxMessageBox("connect falied!");
+			TRACE("connect falied ,%d %s \r\n", GetLastError(), GetwsaErrInfo(WSAGetLastError()).c_str());
+			return false;
+		}
 		return true;
 	}
 
-	bool AcceptClient() {
-		sockaddr_in client_addr;
-		
-		int cli_sz = sizeof(client_addr);
-		m_client = accept(m_sock, (sockaddr*)&client_addr, &cli_sz);
-		if (m_client == -1) return false;
-		return true;
-	}
+	
 #define  BUFFER_SIZE 4096
 	int DealCommand() {
-		if (m_client == -1) return false;
+		if (m_sock == -1) return false;
 		//char buffer[1024] = {};
 		char* buffer = new char[BUFFER_SIZE];
 		memset(buffer, 0, BUFFER_SIZE);
@@ -153,17 +152,17 @@ public:
 			}
 		}
 		return -1;
-		
+
 
 	}
 	bool Send(const char* pData, int nSize) {
-		if (m_client == -1) return false;
-		return send(m_client, pData, nSize, 0) > 0;
+		if (m_sock == -1) return false;
+		return send(m_sock, pData, nSize, 0) > 0;
 
 	}
-	bool Send( CPacket& pack) {
-		if (m_client == -1) return false;
-		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
+	bool Send(CPacket& pack) {
+		if (m_sock == -1) return false;
+		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
 
 	}
 	bool GetFilePath(std::string& strPath) {
@@ -173,31 +172,23 @@ public:
 		}
 		return false;
 	}
-	CPacket& GetPacket() {
-		return m_packet;
-	}
-	void CloseClient() {
-		closesocket(m_client);
-		m_client = INVALID_SOCKET;
-	}
 private:
-	
-	SOCKET m_sock,m_client;
+
+	SOCKET m_sock;
 	CPacket m_packet;
-	CServerSocket& operator=(const CServerSocket&ss) {
+	CClientSocket& operator=(const CClientSocket& ss) {
 		m_sock = ss.m_sock;
-		m_client = ss.m_client;
+		
 	}
-	CServerSocket() {
+	CClientSocket() {
 		m_sock = -1;
-		m_client = INVALID_SOCKET;
 		if (!InitSocketEnv()) {
 			MessageBox(NULL, _T("can not initialized socket environment, please check network settings"), _T("socket initialize error!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
 		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 	}
-	~CServerSocket() {
+	~CClientSocket() {
 		closesocket(m_sock);
 		WSACleanup();
 
@@ -210,22 +201,22 @@ private:
 		}
 		return true;
 	}
-	
+
 	static void ReleaseInstance() {
 		if (m_instance) {
-			CServerSocket* tmp = m_instance;
+			CClientSocket* tmp = m_instance;
 			m_instance = nullptr;
 			delete tmp;
 		}
 
 	}
-	static CServerSocket* m_instance;
+	static CClientSocket* m_instance;
 
 	class CHelper
 	{
 	public:
-		CHelper() { CServerSocket::getInstance(); }
-		~CHelper() { CServerSocket::ReleaseInstance(); }
+		CHelper() { CClientSocket::getInstance(); }
+		~CHelper() { CClientSocket::ReleaseInstance(); }
 
 	private:
 
@@ -235,4 +226,6 @@ private:
 
 
 //extern CServerSocket server;
+
+
 
