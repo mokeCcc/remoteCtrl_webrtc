@@ -170,7 +170,14 @@ int UnlockMachine() {
     return 0;
 
 }
+int TestConnect() {
+    TRACE("TestConnect send command id: 1981\r\n");
+    CPacket packet(1981, NULL, 0);
+    CServerSocket::getInstance()->Send(packet);
+    return 0;
+}
 int ExcuteCommand(WORD nCmd) {
+    TRACE("ExcuteCommand!  command id: %d\r\n",nCmd);
     int ret = 0;
     switch (nCmd)
     {
@@ -194,6 +201,9 @@ int ExcuteCommand(WORD nCmd) {
         break;
     case 7:
         ret = UnlockMachine();
+        break;
+    case 1981:
+        ret = TestConnect();
         break;
     }
 
@@ -231,9 +241,10 @@ int main()
                     count++;
                 }
                 int ret = pserver->DealCommand();
-                if( ret == 0) {
+                TRACE("Server DealCommand result:%d\r\n", ret);
+                if( ret > 0) {
 
-                   ret = ExcuteCommand(pserver->GetPacket().wdCmd);
+                   ret = ExcuteCommand(ret);
                    if( ret != 0) {
                        TRACE("Excute Command error %d ret = %d", pserver->GetPacket().wdCmd, ret);
                    }

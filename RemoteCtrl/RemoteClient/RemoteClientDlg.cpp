@@ -161,7 +161,13 @@ void CRemoteClientDlg::OnBnClickedBtnTest()
 	bool ret = pClienet->InitializeSocket("127.0.0.1");
 	if (!ret) {
 		AfxMessageBox("network init failed!");
+		return;
 	}
-	//CPacket pack;
-	//pClienet->Send(pack);
+	CPacket pack(1981,NULL,0);
+	ret = pClienet->Send(pack);
+	TRACE("Client send result:%d\r\n", ret);
+	int dwCommand = pClienet->DealCommand();
+	TRACE("Client DealCommand:%d\r\n", dwCommand);
+	pClienet->GetPacket();
+	pClienet->CloseServerSocket();
 }

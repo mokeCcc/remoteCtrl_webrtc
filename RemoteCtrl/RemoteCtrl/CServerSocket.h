@@ -56,23 +56,23 @@ public:
 		}
 		return *this;
 	}
-	CPacket(const BYTE* pData, unsigned int& nSize) {
-		unsigned int  i;
-		for (i = 0; i < nSize; i++) {
-			if (*(WORD*)(pData + i) == 0xFEFF) {
+	CPacket(const BYTE* pData, size_t& nSize) {
+		size_t i;
+		for (i = 0; i < nSize; i++) { //由于使用TCP buffer 开头不一定是packet开头 所以需要去找包头
+			if (*(WORD*)(pData + i) == 0xFEFF) { 
 				wdHead = *(WORD*)(pData + i);
 				i += 2;
 				break;
 			}
 		}
-		if (i + 8 >= nSize) { nSize = 0; return; }  //0x8 is dwLength AND wdHead AND wdCmd
+		if (i + 8 > nSize) { nSize = 0; return; }  //0x8 is dwLength AND wdHead AND wdCmd
 		dwLength = *(DWORD*)(pData + i); i += 4;
-		wdCmd = *(WORD*)(pData + i); i += 2;
+		
 		if (dwLength + i > nSize) { // packet receive not 
 			nSize = 0;
 			return;
 		}
-
+		wdCmd = *(WORD*)(pData + i); i += 2;
 		if (dwLength > 4) {
 			strData.resize(dwLength - 4);
 			memcpy((void*)strData.c_str(), pData + 6, dwLength - 4);
@@ -85,7 +85,7 @@ public:
 		}
 		if (wdSumCheck == 0) {
 			nSize = i;  // length4  head 2 a and data
-
+			return;
 		}
 		nSize = 0;
 	}
@@ -130,28 +130,37 @@ public:
 		
 		int cli_sz = sizeof(client_addr);
 		m_client = accept(m_sock, (sockaddr*)&client_addr, &cli_sz);
+		TRACE(" m_client : %d \r\n", m_client);
 		if (m_client == -1) return false;
 		return true;
 	}
 #define  BUFFER_SIZE 4096
 	int DealCommand() {
+		TRACE("Server DealCommand inside!\r\n");
 		if (m_client == -1) return false;
 		//char buffer[1024] = {};
 		char* buffer = new char[BUFFER_SIZE];
 		memset(buffer, 0, BUFFER_SIZE);
-		unsigned int  idx = 0;
+		size_t  idx = 0;
 		while (true) {
-			unsigned int  len = recv(m_sock, buffer + idx, BUFFER_SIZE - idx, 0);
-			if (len <= 0) return -1;
+			size_t len = recv(m_client, buffer + idx, BUFFER_SIZE - idx, 0);
+			TRACE("recv data len : %d \r\n", len);
+			if (len <= 0) {
+				delete[] buffer;
+				return -1; 
+			}
 			idx += len;
 			len = idx;
 			m_packet = CPacket((BYTE*)buffer, len);
 			if (len > 0) {
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);
 				idx -= len;
+				TRACE("Server DealCommand result: %d \r\n", m_packet.wdCmd);
+				delete[] buffer;
 				return m_packet.wdCmd;
 			}
 		}
+		delete[] buffer;
 		return -1;
 		
 

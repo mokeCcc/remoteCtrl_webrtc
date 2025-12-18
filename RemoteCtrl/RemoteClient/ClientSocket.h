@@ -1,5 +1,6 @@
 #pragma once
 #include <string> 
+#include <vector>
 #pragma pack(push)
 #pragma pack(1)
 class CPacket
@@ -62,14 +63,14 @@ public:
 				break;
 			}
 		}
-		if (i + 8 >= nSize) { nSize = 0; return; }  //0x8 is dwLength AND wdHead AND wdCmd
+		if (i + 8 > nSize) { nSize = 0; return; }  //0x8 is dwLength AND wdHead AND wdCmd
 		dwLength = *(DWORD*)(pData + i); i += 4;
-		wdCmd = *(WORD*)(pData + i); i += 2;
+		
 		if (dwLength + i > nSize) { // packet receive not 
 			nSize = 0;
 			return;
 		}
-
+		wdCmd = *(WORD*)(pData + i); i += 2;
 		if (dwLength > 4) {
 			strData.resize(dwLength - 4);
 			memcpy((void*)strData.c_str(), pData + 6, dwLength - 4);
@@ -82,7 +83,7 @@ public:
 		}
 		if (wdSumCheck == 0) {
 			nSize = i;  // length4  head 2 a and data
-
+			return;
 		}
 		nSize = 0;
 	}
@@ -111,7 +112,10 @@ public:
 	}
 
 	bool InitializeSocket(const std::string strIPAddress) {
+		if (m_sock != INVALID_SOCKET) CloseServerSocket();
+		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (m_sock == -1) return false;
+		
 		// TODO: check socket value
 		sockaddr_in serv_addr;
 		memset(&serv_addr, 0, sizeof(serv_addr));
@@ -131,12 +135,17 @@ public:
 		return true;
 	}
 
-	
+	void CloseServerSocket() {
+
+		closesocket(m_sock);
+		m_sock = INVALID_SOCKET;
+	}
 #define  BUFFER_SIZE 4096
 	int DealCommand() {
+		TRACE("DealCommand inside!\r\n");
 		if (m_sock == -1) return false;
 		//char buffer[1024] = {};
-		char* buffer = new char[BUFFER_SIZE];
+		char* buffer = m_buffer.data();
 		memset(buffer, 0, BUFFER_SIZE);
 		unsigned int  idx = 0;
 		while (true) {
@@ -165,6 +174,9 @@ public:
 		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
 
 	}
+	CPacket& GetPacket() {
+		return m_packet;
+	}
 	bool GetFilePath(std::string& strPath) {
 		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4)) {
 			strPath = m_packet.strData;
@@ -175,6 +187,7 @@ public:
 private:
 
 	SOCKET m_sock;
+	std::vector<char> m_buffer;
 	CPacket m_packet;
 	CClientSocket& operator=(const CClientSocket& ss) {
 		m_sock = ss.m_sock;
@@ -186,7 +199,8 @@ private:
 			MessageBox(NULL, _T("can not initialized socket environment, please check network settings"), _T("socket initialize error!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
-		m_sock = socket(PF_INET, SOCK_STREAM, 0);
+		m_buffer.resize(BUFFER_SIZE);
+		
 	}
 	~CClientSocket() {
 		closesocket(m_sock);
