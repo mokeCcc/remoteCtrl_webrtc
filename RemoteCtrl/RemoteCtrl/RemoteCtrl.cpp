@@ -31,17 +31,18 @@ VOID Dump(BYTE* pData, unsigned int  nSize) {
 }
 int  MakeDriverInfo() {
    std::string res;
-   for (int i = 1; i< 26; i++)
+   for (int i = 1; i < 26; i++)
    {
        if(_chdrive(i)  == 0){
            if (res.size() > 0) res += ',';
            res += 'A' + i - 1;
        }
    }
+   res += ',';
    CPacket packet(1, (BYTE*)res.c_str(), res.size());
    Dump((BYTE*)packet.Data(), packet.Size());
-  // CServerSocket::getInstance()->Send(packet);
-   return 1;
+   CServerSocket::getInstance()->Send(packet);
+   return 0;
 }
 typedef struct file_info{
     file_info() {
@@ -246,7 +247,7 @@ int main()
 
                    ret = ExcuteCommand(ret);
                    if( ret != 0) {
-                       TRACE("Excute Command error %d ret = %d", pserver->GetPacket().wdCmd, ret);
+                       TRACE("Server : Excute Command error %d ret = %d \r\n", pserver->GetPacket().wdCmd, ret);
                    }
                    pserver->CloseClient();
                  }

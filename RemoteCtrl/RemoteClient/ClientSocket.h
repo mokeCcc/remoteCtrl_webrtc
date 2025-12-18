@@ -73,16 +73,16 @@ public:
 		wdCmd = *(WORD*)(pData + i); i += 2;
 		if (dwLength > 4) {
 			strData.resize(dwLength - 4);
-			memcpy((void*)strData.c_str(), pData + 6, dwLength - 4);
+			memcpy((void*)strData.c_str(), pData + i, dwLength - 4);
 			i += dwLength - 4;
 		}
-		wdSumCheck = *(WORD*)(pData + i); i += 2;
+		wdSumCheck = *(WORD*)(pData + i); 
 		for (unsigned int j = 0; j < strData.size(); j++)
 		{
 			wdSumCheck -= BYTE(strData[j]) & 0xff;
 		}
 		if (wdSumCheck == 0) {
-			nSize = i;  // length4  head 2 a and data
+			nSize = dwLength + 6;  // length4  head 2 a and data
 			return;
 		}
 		nSize = 0;
@@ -111,7 +111,7 @@ public:
 		return m_instance;
 	}
 
-	bool InitializeSocket(const std::string strIPAddress) {
+	bool InitializeSocket(int nIPAddress,int nPort) {
 		if (m_sock != INVALID_SOCKET) CloseServerSocket();
 		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (m_sock == -1) return false;
@@ -120,8 +120,8 @@ public:
 		sockaddr_in serv_addr;
 		memset(&serv_addr, 0, sizeof(serv_addr));
 		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_addr.s_addr = inet_addr(strIPAddress.c_str()); 
-		serv_addr.sin_port = htons(8086);
+		serv_addr.sin_addr.s_addr = htonl(nIPAddress); 
+		serv_addr.sin_port = htons(nPort);
 		if (serv_addr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox("IP dont exsit!");
 			return false;

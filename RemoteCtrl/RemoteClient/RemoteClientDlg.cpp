@@ -52,6 +52,8 @@ END_MESSAGE_MAP()
 
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
+	, m_remote_address(0)
+	, m_remote_port(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -59,6 +61,27 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_IPAddress(pDX, IDC_IPADDRESS_REMOTE, m_remote_address);
+	DDX_Text(pDX, IDC_EDIT_PORT, m_remote_port);
+	DDX_Control(pDX, IDC_TREE_DIR, m_Tree);
+}
+
+int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nlenghth)
+{
+	UpdateData();
+	CClientSocket* pClienet = CClientSocket::getInstance();
+	bool ret = pClienet->InitializeSocket(m_remote_address, atoi((LPCTSTR)m_remote_port));
+	if (!ret) {
+		AfxMessageBox("network init failed!");
+		return -1;
+	}
+	CPacket pack(nCmd, pData, nlenghth);
+	ret = pClienet->Send(pack);
+	TRACE("Client send result:%d\r\n", ret);
+	int dwCommand = pClienet->DealCommand();
+	TRACE("Client DealCommand:%d\r\n", dwCommand);
+	pClienet->CloseServerSocket();
+	return dwCommand;
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -66,6 +89,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
+	ON_BN_CLICKED(IDC_BUTTON_VIEWFILE, &CRemoteClientDlg::OnBnClickedButtonViewfile)
 END_MESSAGE_MAP()
 
 
@@ -101,7 +125,10 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-
+	UpdateData();
+	m_remote_address = 0x7F000001;
+	m_remote_port = _T("8086");
+	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -157,17 +184,30 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
-	CClientSocket* pClienet = CClientSocket::getInstance();
-	bool ret = pClienet->InitializeSocket("127.0.0.1");
-	if (!ret) {
-		AfxMessageBox("network init failed!");
-		return;
+	SendCommandPacket(1981);
+}
+
+
+void CRemoteClientDlg::OnBnClickedButtonViewfile()
+{
+	// TODO: Add your control notification handler code here
+	int ret = SendCommandPacket(1);
+	if (ret == -1) {
+		AfxMessageBox("command handled error!");
+		return ;
 	}
-	CPacket pack(1981,NULL,0);
-	ret = pClienet->Send(pack);
-	TRACE("Client send result:%d\r\n", ret);
-	int dwCommand = pClienet->DealCommand();
-	TRACE("Client DealCommand:%d\r\n", dwCommand);
-	pClienet->GetPacket();
-	pClienet->CloseServerSocket();
+	CClientSocket* pClient = CClientSocket::getInstance();
+	std::string drivers_info = pClient->GetPacket().strData;
+	std::string dr;
+	m_Tree.DeleteAllItems();
+	for (size_t i = 0; i < drivers_info.size(); i++) {
+		if (drivers_info[i] == ',') {
+			dr += ":";
+			m_Tree.InsertItem(dr.c_str(),TVI_ROOT,TVI_LAST);
+			dr.clear();
+			continue;
+		}
+		dr += drivers_info[i];
+	}
+
 }
