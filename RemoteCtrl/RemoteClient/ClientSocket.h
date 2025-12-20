@@ -101,8 +101,20 @@ private:
 
 
 std::string GetwsaErrInfo(int wsaErrorCode);
+typedef struct file_info {
+	file_info() {
+		IsInvalid = false;
+		IsDirectory = -1;
+		hasNext = true;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	bool IsInvalid; // invalid
+	bool hasNext;
+	char szFileName[256]; //file name
+	bool IsDirectory;   //directory or file
+}FILEINFO, * PFILEINFO;
 
-
+VOID Dump(BYTE* pData, unsigned int  nSize); 
 class CClientSocket
 {
 public:
@@ -146,16 +158,16 @@ public:
 		if (m_sock == -1) return false;
 		//char buffer[1024] = {};
 		char* buffer = m_buffer.data();
-		memset(buffer, 0, BUFFER_SIZE);
-		unsigned int  idx = 0;
+		
+		static unsigned int  idx = 0;
 		while (true) {
 			unsigned int  len = recv(m_sock, buffer + idx, BUFFER_SIZE - idx, 0);
-			if (len <= 0) return -1;
+			if (len <= 0 && idx == 0) return -1;
 			idx += len;
 			len = idx;
 			m_packet = CPacket((BYTE*)buffer, len);
 			if (len > 0) {
-				memmove(buffer, buffer + len, BUFFER_SIZE - len);
+				memmove(buffer, buffer + len, idx - len);
 				idx -= len;
 				return m_packet.wdCmd;
 			}
@@ -164,13 +176,17 @@ public:
 
 
 	}
+
+
 	bool Send(const char* pData, int nSize) {
 		if (m_sock == -1) return false;
 		return send(m_sock, pData, nSize, 0) > 0;
 
 	}
 	bool Send(CPacket& pack) {
+
 		if (m_sock == -1) return false;
+		Dump((BYTE* )pack.Data(), pack.Size());
 		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
 
 	}
@@ -200,6 +216,7 @@ private:
 			exit(0);
 		}
 		m_buffer.resize(BUFFER_SIZE);
+		memset(m_buffer.data(), 0, BUFFER_SIZE);
 		
 	}
 	~CClientSocket() {

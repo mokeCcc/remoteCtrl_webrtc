@@ -75,10 +75,10 @@ public:
 		wdCmd = *(WORD*)(pData + i); i += 2;
 		if (dwLength > 4) {
 			strData.resize(dwLength - 4);
-			memcpy((void*)strData.c_str(), pData + 6, dwLength - 4);
+			memcpy((void*)strData.c_str(), pData + 8, dwLength - 4);
 			i += dwLength - 4;
 		}
-		wdSumCheck = *(WORD*)(pData + i); i += 2;
+		wdSumCheck = *(WORD*)(pData + i); 
 		for (unsigned int j =0; j < strData.size();j++)
 		{
 			wdSumCheck -= BYTE(strData[j]) & 0xff;
@@ -97,11 +97,26 @@ public:
 	std::string strData;  // packet data 
 	WORD wdSumCheck;
 	std::string strOut;
+
+
 private:
 };
 #pragma  pack (pop)
 
+typedef struct file_info {
+	file_info() {
+		IsInvalid = false;
+		IsDirectory = -1;
+		hasNext = true;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	bool IsInvalid; // invalid
+	bool hasNext;
+	char szFileName[256]; //file name
+	bool IsDirectory;   //directory or file
+}FILEINFO, * PFILEINFO;
 
+VOID Dump(BYTE* pData, unsigned int  nSize);
 class CServerSocket
 {
 public:
@@ -152,6 +167,7 @@ public:
 			idx += len;
 			len = idx;
 			m_packet = CPacket((BYTE*)buffer, len);
+			TRACE("[Client command id : %d] \r\n", m_packet.wdCmd);
 			if (len > 0) {
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);
 				idx -= len;
@@ -166,6 +182,7 @@ public:
 
 	}
 	bool Send(const char* pData, int nSize) {
+		Dump((BYTE*)pData, nSize);
 		if (m_client == -1) return false;
 		return send(m_client, pData, nSize, 0) > 0;
 

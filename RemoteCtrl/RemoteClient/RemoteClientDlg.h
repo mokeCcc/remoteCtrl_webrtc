@@ -10,8 +10,9 @@ class CRemoteClientDlg : public CDialogEx
 {
 // Construction
 public:
+	CString getItemPath(HTREEITEM hTreeItem);
 	CRemoteClientDlg(CWnd* pParent = nullptr);	// standard constructor
-
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_REMOTECLIENT_DIALOG };
@@ -21,7 +22,14 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 private:
-	int SendCommandPacket(int nCmd, BYTE* pData = NULL, size_t nlenghth = 0);
+	/*
+	* nCmd paratemters:
+	* 1:get dirvers inforamtions
+	* 2:get directlies or files  inforamtions
+	* 3:run files
+	* 4:get screens
+	*/
+	int SendCommandPacket(int nCmd, bool autoCloseSocket = true,BYTE* pData = NULL, size_t nlenghth = 0);
 // Implementation
 protected:
 	HICON m_hIcon;
@@ -38,4 +46,7 @@ public:
 	CString m_remote_port;
 	afx_msg void OnBnClickedButtonViewfile();
 	CTreeCtrl m_Tree;
+	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
+	CListCtrl m_List;
+	afx_msg void OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult);
 };

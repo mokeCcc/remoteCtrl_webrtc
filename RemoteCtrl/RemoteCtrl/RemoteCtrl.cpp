@@ -44,18 +44,7 @@ int  MakeDriverInfo() {
    CServerSocket::getInstance()->Send(packet);
    return 0;
 }
-typedef struct file_info{
-    file_info() {
-        IsInvalid = false;
-        IsDirectory = -1;
-        hasNext = true;
-        memset(szFileName, 0, sizeof(szFileName));
-    }
-    bool IsInvalid; // invalid
-    bool hasNext;
-    char szFileName[256]; //file name
-    bool IsDirectory;   //directory or file
-}FILEINFO,*PFINEINFO;
+
 
 int SendScreen() {
     // TODO: multi screen 
@@ -95,32 +84,43 @@ int MakeDirectoryInfo() {
     std::string strPath;
   //  std::list<FILEINFO> lstFileInfos;
     if (!CServerSocket::getInstance()->GetFilePath(strPath)) return -1;  //command phrase error
+
     if (_chdir(strPath.c_str()) != 0) { 
         FILEINFO finfo;
-        finfo.IsInvalid = true;
-        finfo.IsDirectory = true;
+        //finfo.IsInvalid = true;
+        //finfo.IsDirectory = true;
         finfo.hasNext = false;
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+        // memcpy(finfo.szFileName, st rPath.c_str(), strPath.size());
        // lstFileInfos.push_back(finfo);
-        CPacket pack(2,(BYTE*) & finfo, sizeof(finfo));
+       // TRACE("[%s] isdir: %d", finfo.szFileName, finfo.IsDirectory);
+        OutputDebugString(_T("has no valid  to access the directory!"));
+        CPacket pack(2,(BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
         return -2;
     }// can not to access dir
     _finddata_t fdata;
-    int hfind = 0;
-    if ((hfind = _findfirst("*", &fdata))== -1) {
+    intptr_t hfind = 0;
+    hfind = _findfirst("*", &fdata);
+    if (hfind == -1) {
         OutputDebugString(_T("can not find any file"));
+        FILEINFO finfo;
+        finfo.hasNext = false;
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
         return -3;
     }
+ 
     do {
-        FILEINFO finfo; 
+        FILEINFO finfo;
+        //ZeroMemory(&finfo, sizeof(finfo));
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
        // finfo.IsInvalid = false;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+        TRACE("transport :[%s] \r\n", finfo.szFileName);
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
 		CServerSocket::getInstance()->Send(pack);
       //  lstFileInfos.push_back(finfo);
-    } while (!_findnext(hfind,&fdata));
+    } while (_findnext(hfind,&fdata) == 0);
 
     FILEINFO finfo;
     finfo.hasNext = false;
@@ -245,6 +245,7 @@ int main()
                 TRACE("Server DealCommand result:%d\r\n", ret);
                 if( ret > 0) {
 
+                   
                    ret = ExcuteCommand(ret);
                    if( ret != 0) {
                        TRACE("Server : Excute Command error %d ret = %d \r\n", pserver->GetPacket().wdCmd, ret);
