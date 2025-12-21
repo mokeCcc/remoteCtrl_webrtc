@@ -27,7 +27,8 @@ private:
 	* 1:get dirvers inforamtions
 	* 2:get directlies or files  inforamtions
 	* 3:run files
-	* 4:get screens
+	* 4:get files
+	* 5:get screnns
 	*/
 	int SendCommandPacket(int nCmd, bool autoCloseSocket = true,BYTE* pData = NULL, size_t nlenghth = 0);
 // Implementation
@@ -49,4 +50,5 @@ public:
 	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
 	CListCtrl m_List;
 	afx_msg void OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnFilecontrolDownload();
 };

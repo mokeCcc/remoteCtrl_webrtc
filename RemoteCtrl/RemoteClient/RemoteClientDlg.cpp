@@ -126,6 +126,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_VIEWFILE, &CRemoteClientDlg::OnBnClickedButtonViewfile)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
+	ON_COMMAND(ID_FILECONTROL_DOWNLOAD, &CRemoteClientDlg::OnFilecontrolDownload)
 END_MESSAGE_MAP()
 
 
@@ -323,4 +324,51 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 		Popup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
 	}
 
+}
+
+void CRemoteClientDlg::OnFilecontrolDownload()
+{
+	// TODO: Add your command handler code here
+	int nListSelected = m_List.GetSelectionMark();
+	CString strFile = m_List.GetItemText(nListSelected,0);
+	CFileDialog dlg(FALSE, NULL, strFile,OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT,NULL,this);
+
+	if (dlg.DoModal() == IDOK) {
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
+		if (pFile == NULL) return;
+		HTREEITEM hTree = m_Tree.GetSelectedItem();
+		strFile = getItemPath(hTree) + strFile;
+
+		TRACE("Download files inside current selected file name : [%s]\r\n", strFile);
+
+		CClientSocket* pClient = CClientSocket::getInstance();
+		int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+
+		if (ret < 0) {
+			TRACE("sendCommand 4 ret -1");
+			pClient->CloseServerSocket();
+			return;
+		}
+
+		LONGLONG szFile = *(PLONGLONG)(pClient->GetPacket().strData.c_str());
+
+		TRACE("DOWNLOAD FILE LENGTH : %lld\r\n", szFile);
+
+		LONGLONG nCount = 0;
+
+
+		
+		while (nCount < szFile) {
+			ret = pClient->DealCommand();
+			if (ret < 0) {
+				TRACE("TRANSPORT ERROR!\r\n");
+				pClient->CloseServerSocket();
+				break;
+			}
+			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().Size(), pFile);
+			nCount += pClient->GetPacket().Size();
+		}
+		fclose(pFile);
+		pClient->CloseServerSocket();
+	}
 }
