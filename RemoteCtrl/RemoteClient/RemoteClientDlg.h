@@ -3,8 +3,8 @@
 //
 
 #pragma once
-
-
+#include "StatusDlg.h"
+#define WM_SEND_PACKET  (WM_USER  + 1)
 // CRemoteClientDlg dialog
 class CRemoteClientDlg : public CDialogEx
 {
@@ -13,6 +13,8 @@ public:
 	CString getItemPath(HTREEITEM hTreeItem);
 	CRemoteClientDlg(CWnd* pParent = nullptr);	// standard constructor
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
+	void threadDownloadFiles();
+	static void threadEntryForDownFile(void* arg);
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_REMOTECLIENT_DIALOG };
@@ -34,7 +36,7 @@ private:
 // Implementation
 protected:
 	HICON m_hIcon;
-
+	CStatusDlg m_StatusDlg;
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
@@ -53,4 +55,5 @@ public:
 	afx_msg void OnFilecontrolDownload();
 	afx_msg void OnFilecontrolOpen();
 	afx_msg void OnFilecontrolDelete();
+	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);
 };

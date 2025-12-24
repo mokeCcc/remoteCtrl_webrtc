@@ -8,6 +8,7 @@
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
 #include "ClientSocket.h"
+#include <thread>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -90,6 +91,60 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 
 }
 
+void CRemoteClientDlg::threadDownloadFiles()
+{
+	int nListSelected = m_List.GetSelectionMark();
+	CString strFile = m_List.GetItemText(nListSelected, 0);
+	CFileDialog dlg(FALSE, NULL, strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
+
+	if (dlg.DoModal() == IDOK) {
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
+		if (pFile == NULL) return;
+		HTREEITEM hTree = m_Tree.GetSelectedItem();
+		strFile = getItemPath(hTree) + strFile;
+
+		TRACE("Download files inside current selected file name : [%s]\r\n", strFile);
+
+		CClientSocket* pClient = CClientSocket::getInstance();
+		//int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+		int  ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);
+		if (ret < 0) {
+			TRACE("sendCommand 4 ret -1");
+			pClient->CloseServerSocket();
+			return;
+		}
+
+		LONGLONG szFile = *(PLONGLONG)(pClient->GetPacket().strData.c_str());
+
+		TRACE("DOWNLOAD FILE LENGTH : %lld\r\n", szFile);
+
+		LONGLONG nCount = 0;
+
+
+
+		while (nCount < szFile) {
+			ret = pClient->DealCommand();
+			if (ret < 0) {
+				TRACE("TRANSPORT ERROR!\r\n");
+				pClient->CloseServerSocket();
+				break;
+			}
+			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().Size(), pFile);
+			nCount += pClient->GetPacket().Size();
+		}
+		fclose(pFile);
+		pClient->CloseServerSocket();
+	}
+	m_StatusDlg.ShowWindow(SW_HIDE);
+	MessageBox("The File has Downloaded!", "Info");
+}
+
+void CRemoteClientDlg::threadEntryForDownFile(void* arg)
+{
+	CRemoteClientDlg* thiz = reinterpret_cast<CRemoteClientDlg*> (arg);
+	thiz->threadDownloadFiles();
+}
+
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
@@ -129,6 +184,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_FILECONTROL_DOWNLOAD, &CRemoteClientDlg::OnFilecontrolDownload)
 	ON_COMMAND(ID_FILECONTROL_OPEN, &CRemoteClientDlg::OnFilecontrolOpen)
 	ON_COMMAND(ID_FILECONTROL_DELETE, &CRemoteClientDlg::OnFilecontrolDelete)
+	ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)
 END_MESSAGE_MAP()
 
 
@@ -168,6 +224,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	m_remote_address = 0x7F000001;
 	m_remote_port = _T("8086");
 	UpdateData(FALSE);
+	m_StatusDlg.Create(IDD_DIG_INFO, this);
+	m_StatusDlg.ShowWindow(SW_HIDE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -331,48 +389,17 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 void CRemoteClientDlg::OnFilecontrolDownload()
 {
 	// TODO: Add your command handler code here
-	int nListSelected = m_List.GetSelectionMark();
-	CString strFile = m_List.GetItemText(nListSelected,0);
-	CFileDialog dlg(FALSE, NULL, strFile,OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT,NULL,this);
-
-	if (dlg.DoModal() == IDOK) {
-		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
-		if (pFile == NULL) return;
-		HTREEITEM hTree = m_Tree.GetSelectedItem();
-		strFile = getItemPath(hTree) + strFile;
-
-		TRACE("Download files inside current selected file name : [%s]\r\n", strFile);
-
-		CClientSocket* pClient = CClientSocket::getInstance();
-		int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-
-		if (ret < 0) {
-			TRACE("sendCommand 4 ret -1");
-			pClient->CloseServerSocket();
-			return;
-		}
-
-		LONGLONG szFile = *(PLONGLONG)(pClient->GetPacket().strData.c_str());
-
-		TRACE("DOWNLOAD FILE LENGTH : %lld\r\n", szFile);
-
-		LONGLONG nCount = 0;
+	
 
 
-		
-		while (nCount < szFile) {
-			ret = pClient->DealCommand();
-			if (ret < 0) {
-				TRACE("TRANSPORT ERROR!\r\n");
-				pClient->CloseServerSocket();
-				break;
-			}
-			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().Size(), pFile);
-			nCount += pClient->GetPacket().Size();
-		}
-		fclose(pFile);
-		pClient->CloseServerSocket();
-	}
+	std::thread threadDownLoad(&CRemoteClientDlg::threadEntryForDownFile,this);
+	Sleep(50);
+	//threadDownLoad.join();
+	threadDownLoad.detach();
+	m_StatusDlg.m_info.SetWindowText(_T("The file is downloading!!!"));
+	m_StatusDlg.ShowWindow(SW_SHOW);
+	m_StatusDlg.CenterWindow(this);
+	m_StatusDlg.SetActiveWindow();
 }
 
 
@@ -420,4 +447,12 @@ void CRemoteClientDlg::OnFilecontrolDelete()
 			pfinfo = (PFILEINFO)(pClient->GetPacket().strData.c_str());
 		}
 	pClient->CloseServerSocket();
+}
+
+LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
+{
+	CString strFile = (LPCTSTR)lParam;
+	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+
+	return ret;
 }
