@@ -178,6 +178,14 @@ int TestConnect() {
     CServerSocket::getInstance()->Send(packet);
     return 0;
 }
+int DeleteFileByCommand() {
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    DeleteFile(strPath.c_str());
+    CPacket pack(9, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
 int ExcuteCommand(WORD nCmd) {
     TRACE("ExcuteCommand!  command id: %d\r\n",nCmd);
     int ret = 0;
@@ -206,6 +214,9 @@ int ExcuteCommand(WORD nCmd) {
         break;
     case 1981:
         ret = TestConnect();
+        break;
+    case 8:
+        ret = DeleteFileByCommand();
         break;
     }
 

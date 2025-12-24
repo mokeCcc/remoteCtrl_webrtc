@@ -51,4 +51,6 @@ public:
 	CListCtrl m_List;
 	afx_msg void OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnFilecontrolDownload();
+	afx_msg void OnFilecontrolOpen();
+	afx_msg void OnFilecontrolDelete();
 };

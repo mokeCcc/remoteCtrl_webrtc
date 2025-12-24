@@ -127,6 +127,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 	ON_COMMAND(ID_FILECONTROL_DOWNLOAD, &CRemoteClientDlg::OnFilecontrolDownload)
+	ON_COMMAND(ID_FILECONTROL_OPEN, &CRemoteClientDlg::OnFilecontrolOpen)
+	ON_COMMAND(ID_FILECONTROL_DELETE, &CRemoteClientDlg::OnFilecontrolDelete)
 END_MESSAGE_MAP()
 
 
@@ -371,4 +373,51 @@ void CRemoteClientDlg::OnFilecontrolDownload()
 		fclose(pFile);
 		pClient->CloseServerSocket();
 	}
+}
+
+
+void CRemoteClientDlg::OnFilecontrolOpen()
+{
+	// TODO: Add your command handler code here
+
+	int nSelectedItem = m_List.GetSelectionMark();
+	CString	strFile = m_List.GetItemText(nSelectedItem,0);
+	HTREEITEM hTree = m_Tree.GetSelectedItem();
+	strFile = getItemPath(hTree) + strFile;
+	CClientSocket* pClient = CClientSocket::getInstance();
+	int ret = SendCommandPacket(3, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+	if (ret < 0) return;
+
+	TRACE("[Open file %s has done!]\r\n", strFile);
+}
+
+
+void CRemoteClientDlg::OnFilecontrolDelete()
+{
+	// TODO: Add your command handler code here
+	int nSelectedItem = m_List.GetSelectionMark();
+	CString	strFile = m_List.GetItemText(nSelectedItem, 0);
+	HTREEITEM hTree = m_Tree.GetSelectedItem();
+	CString strPath = getItemPath(hTree);
+	strFile = strPath + strFile;
+	CClientSocket* pClient = CClientSocket::getInstance();
+	int ret = SendCommandPacket(8, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+	if (ret < 0) return;
+
+	TRACE("[Delete file %s has done!]\r\n", strFile);
+
+	m_List.DeleteAllItems();
+	SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	
+	PFILEINFO pfinfo = (PFILEINFO)(pClient->GetPacket().strData.c_str());
+	while(pfinfo->hasNext) {
+			if (!pfinfo->IsDirectory) {
+				m_List.InsertItem(0, pfinfo->szFileName);
+			}
+			int dwCmd = pClient->DealCommand();
+			TRACE("Client DealCommand:%d\r\n", dwCmd);
+			if (dwCmd < 0) break;
+			pfinfo = (PFILEINFO)(pClient->GetPacket().strData.c_str());
+		}
+	pClient->CloseServerSocket();
 }

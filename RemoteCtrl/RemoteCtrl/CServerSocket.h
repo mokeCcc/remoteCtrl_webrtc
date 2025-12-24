@@ -193,7 +193,7 @@ public:
 
 	}
 	bool GetFilePath(std::string& strPath) {
-		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4)) {
+		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4) || m_packet.wdCmd ==8) {
 			strPath = m_packet.strData;
 			return true;
 		}
