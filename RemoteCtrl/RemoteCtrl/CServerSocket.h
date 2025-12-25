@@ -9,7 +9,7 @@ class CPacket
 {
 public:
 	CPacket() :wdHead(0), dwLength(0), wdCmd(0), wdSumCheck(0) {}
-	CPacket(WORD nCmd, const BYTE* pData, unsigned int  nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t  nSize) {
 		wdHead = 0xfeff;
 		dwLength = nSize + 4;
 		wdCmd = nCmd;
@@ -21,7 +21,7 @@ public:
 			strData.clear();
 		}
 		wdSumCheck = 0;
-		for (unsigned int  j = 0;j<strData.size();j++){
+		for (size_t  j = 0;j<strData.size();j++){
 			wdSumCheck += (BYTE)(strData[j]) &0xff;
 		}
 	}

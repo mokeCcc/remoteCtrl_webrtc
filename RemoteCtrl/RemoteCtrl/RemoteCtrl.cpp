@@ -154,12 +154,14 @@ int DownloadFile() {
     fseek(pFile, 0, SEEK_SET);
     char buffer[1024] = {};
     size_t rlen = 0;
+    size_t send_len = 0;
     do{
         rlen = fread(buffer, 1, 1024, pFile);
+        send_len += rlen;
         CPacket pack(4, (BYTE*)buffer, rlen);
         CServerSocket::getInstance()->Send(pack);
     } while (rlen >= 1024);
-
+    TRACE("[Send file  length : %lld, this file size : %lld] \r\n", send_len, data);
 	CPacket pack(4, NULL, 0);
 	CServerSocket::getInstance()->Send(pack);
     fclose(pFile);
