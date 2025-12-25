@@ -129,8 +129,8 @@ void CRemoteClientDlg::threadDownloadFiles()
 				pClient->CloseServerSocket();
 				break;
 			}
-			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().Size(), pFile);
-			nCount += pClient->GetPacket().Size();
+			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.length(), pFile);
+			nCount += pClient->GetPacket().strData.length();
 		}
 		TRACE(" nCount is %lld \r\n", nCount);
 		fclose(pFile);
