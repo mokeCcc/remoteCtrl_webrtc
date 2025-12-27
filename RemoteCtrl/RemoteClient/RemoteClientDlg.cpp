@@ -146,6 +146,41 @@ void CRemoteClientDlg::threadEntryForDownFile(void* arg)
 	thiz->threadDownloadFiles();
 }
 
+void CRemoteClientDlg::threadEntryForRemoteCtrl(void* arg)
+{
+	CRemoteClientDlg* thiz = reinterpret_cast<CRemoteClientDlg*> (arg);
+	thiz->threadRemoteCtrl();
+}
+
+void CRemoteClientDlg::threadRemoteCtrl()
+{
+	CClientSocket* pClient = nullptr;
+	do
+	{
+		pClient = CClientSocket::getInstance();
+
+	} while (pClient == nullptr);
+
+	for (;;) {
+		if (m_isFull == false) {
+		int ret = SendMessage(WM_SEND_PACKET, 5 << 1 | 0);
+			if (ret == 5) {
+				BYTE* pData = (BYTE*) (pClient->GetPacket().strData.c_str());
+				IStream* pStream = SHCreateMemStream(pData, pClient->GetPacket().strData.length());
+				if (pStream) {
+					HRESULT hr = m_image.Load(pStream);
+					pStream->Release();
+					m_isFull = true;
+				}
+				}
+			
+		}
+		else {
+			Sleep(10);
+		}
+	}
+}
+
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
@@ -186,6 +221,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_FILECONTROL_OPEN, &CRemoteClientDlg::OnFilecontrolOpen)
 	ON_COMMAND(ID_FILECONTROL_DELETE, &CRemoteClientDlg::OnFilecontrolDelete)
 	ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)
+	ON_BN_CLICKED(IDC_BTN_REMOTE, &CRemoteClientDlg::OnBnClickedBtnRemote)
 END_MESSAGE_MAP()
 
 
@@ -227,6 +263,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData(FALSE);
 	m_StatusDlg.Create(IDD_DIG_INFO, this);
 	m_StatusDlg.ShowWindow(SW_HIDE);
+	m_isFull = false;
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -452,8 +489,31 @@ void CRemoteClientDlg::OnFilecontrolDelete()
 
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 {
-	CString strFile = (LPCTSTR)lParam;
-	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-
+	int ret = 0;
+	int cmd = wParam >> 1;
+	switch(cmd) {
+	case 4: {
+		CString strFile = (LPCTSTR)lParam;
+		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+	}
+		break;
+	case 5: {
+		ret = SendCommandPacket(cmd, wParam & 1);
+	}		
+		break;
+	default:
+		ret = -1;
+	}
 	return ret;
+}
+
+void CRemoteClientDlg::OnBnClickedBtnRemote()
+{
+	// TODO: Add your control notification handler code here
+	std::thread threadRemoteCtrl(&CRemoteClientDlg::threadEntryForRemoteCtrl, this);
+
+	threadRemoteCtrl.detach();
+	
+	CRemoteDlgShow dlg(this);
+	dlg.DoModal();
 }

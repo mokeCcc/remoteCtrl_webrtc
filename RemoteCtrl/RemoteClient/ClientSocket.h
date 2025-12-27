@@ -152,7 +152,7 @@ public:
 		closesocket(m_sock);
 		m_sock = INVALID_SOCKET;
 	}
-#define  BUFFER_SIZE 4096
+#define  BUFFER_SIZE 4096000
 	int DealCommand() {
 		TRACE("DealCommand inside!\r\n");
 		if (m_sock == -1) return false;
