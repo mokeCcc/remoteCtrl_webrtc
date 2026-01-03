@@ -7,12 +7,26 @@
 #include "RemoteDlgShow.h"
 #define WM_SEND_PACKET  (WM_USER  + 1)
 // CRemoteClientDlg dialog
+
+typedef struct MouseEvent {
+	MouseEvent() {
+		nAction = 0;
+		nButton = -1;
+		ptXY.x = 0;
+		ptXY.y = 0;
+	}
+	WORD nAction; // Click(1) move(2) dounle Click(4) 
+	WORD nButton;// left(1)  right(2) mid(4)
+	POINT ptXY;
+}MOUSENV, * PMOUSENV;
+
 class CRemoteClientDlg : public CDialogEx
 {
 // Construction
 public:
 	CImage m_image;
 	bool m_isFull;
+	int m_nRemotePixX = -1, m_nRemotePixY = -1;
 	CString getItemPath(HTREEITEM hTreeItem);
 	CRemoteClientDlg(CWnd* pParent = nullptr);	// standard constructor
 	void DeleteTreeChildrenItem(HTREEITEM hTree);

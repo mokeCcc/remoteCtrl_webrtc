@@ -169,6 +169,10 @@ void CRemoteClientDlg::threadRemoteCtrl()
 				IStream* pStream = SHCreateMemStream(pData, pClient->GetPacket().strData.length());
 				if (pStream) {
 					HRESULT hr = m_image.Load(pStream);
+					if (m_nRemotePixX == -1 || m_nRemotePixY == -1) {
+						m_nRemotePixX = m_image.GetWidth();
+						m_nRemotePixY = m_image.GetHeight();
+					}
 					pStream->Release();
 					m_isFull = true;
 				}
@@ -501,6 +505,10 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 		ret = SendCommandPacket(cmd, wParam & 1);
 	}		
 		break;
+	case 9: {
+		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSENV));
+	}
+		  break;
 	default:
 		ret = -1;
 	}

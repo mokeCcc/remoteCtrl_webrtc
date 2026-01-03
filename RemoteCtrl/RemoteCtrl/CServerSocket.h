@@ -116,6 +116,17 @@ typedef struct file_info {
 	bool IsDirectory;   //directory or file
 }FILEINFO, * PFILEINFO;
 
+typedef struct MouseEvent {
+	MouseEvent() {
+		nAction = 0;
+		nButton = -1;
+		ptXY.x = 0;
+		ptXY.y = 0;
+	}
+	WORD nAction; // Click(1) move(2) dounle Click(4) 
+	WORD nButton;// left(1)  right(2) mid(4)
+	POINT ptXY;
+}MOUSENV,*PMOUSENV;
 VOID Dump(BYTE* pData, unsigned int  nSize);
 class CServerSocket
 {
@@ -195,6 +206,13 @@ public:
 	bool GetFilePath(std::string& strPath) {
 		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4) || m_packet.wdCmd ==8) {
 			strPath = m_packet.strData;
+			return true;
+		}
+		return false;
+	}
+	bool GetMouseEvent(MOUSENV& event) {
+		if (m_packet.wdCmd == 9) {
+			memcpy(&event, m_packet.strData.c_str(), sizeof MOUSENV);
 			return true;
 		}
 		return false;

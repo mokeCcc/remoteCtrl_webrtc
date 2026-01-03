@@ -174,6 +174,69 @@ int UnlockMachine() {
     return 0;
 
 }
+int MouseEvent() {
+    MOUSENV event;
+    WORD nCode = 0;
+    if (CServerSocket::getInstance()->GetMouseEvent(event)) {
+        SetCursorPos(event.ptXY.x, event.ptXY.y);
+        TRACE("[Mouse Control xPos: %d yPos:%d]\r\n", event.ptXY.x, event.ptXY.y);
+        switch (event.nAction) {
+        case 0:  //Click
+            nCode |= 0;
+            break;
+        case 1:     //double Click
+            nCode |= 1;
+            break;
+        case 2:   // UP
+            nCode |= 2;
+            break;
+        case 4:  //move
+            nCode |= 4;
+            break;
+        }
+        switch (event.nButton) {
+        case 0:
+            nCode |= 8;
+            break;
+        case 1:
+            nCode |= 16;
+            break;
+        case 2:
+            nCode |= 32;
+            break;
+        }
+        switch (nCode) {
+        case 8:
+            mouse_event(MOUSEEVENTF_LEFTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            break;
+        case 9:
+            mouse_event(MOUSEEVENTF_LEFTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            mouse_event(MOUSEEVENTF_LEFTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+            Sleep(10);
+            mouse_event(MOUSEEVENTF_LEFTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            mouse_event(MOUSEEVENTF_LEFTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+            break;
+        case 10:
+            mouse_event(MOUSEEVENTF_LEFTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+            break;
+        case 16:
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            //mouse_event(MOUSEEVENTF_RIGHTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+
+            break;
+        case 17:
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            mouse_event(MOUSEEVENTF_RIGHTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+            Sleep(10);
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
+            mouse_event(MOUSEEVENTF_RIGHTUP, event.ptXY.x, event.ptXY.y, 0, 0);
+            break;
+        default:
+            break;
+        }
+    }
+    return 0;
+}
 int TestConnect() {
     TRACE("TestConnect send command id: 1981\r\n");
     CPacket packet(1981, NULL, 0);
@@ -219,6 +282,9 @@ int ExcuteCommand(WORD nCmd) {
         break;
     case 8:
         ret = DeleteFileByCommand();
+        break;
+    case 9:
+        ret = MouseEvent();
         break;
     }
 
