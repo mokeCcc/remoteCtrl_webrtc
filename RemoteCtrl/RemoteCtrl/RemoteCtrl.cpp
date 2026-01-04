@@ -37,36 +37,23 @@ int main()
         }
         else
         {
-             
+            CCommand cmd;
             CServerSocket* pserver = CServerSocket::getInstance();
-            int count = 0;
-            if (!pserver->InitializeSocket()) {
+            int ret = pserver->Run(&CCommand::RunCommand, &cmd);
+            
+            switch (ret) {
+            case -1:
                 MessageBox(NULL, _T("network initialized error!"), _T("network  initialized error!"), MB_OK | MB_ICONERROR);
                 exit(0);
-            }
-            while (CServerSocket::getInstance() != NULL) {
-                if (pserver->AcceptClient() == false) {
-                    if (count >= 3) exit(0);
-                    MessageBox(NULL, _T("can not accept client,reagian!"), _T("accept client error"), MB_OK | MB_ICONERROR);
-                    count++;
-                }
-                int ret = pserver->DealCommand();
-                TRACE("Server DealCommand result:%d\r\n", ret);
-                if( ret > 0) {
-
-                   CCommand cmd;
-                   ret = ExcuteCommand(ret);
-                   if( ret != 0) {
-                       TRACE("Server : Excute Command error %d ret = %d \r\n", pserver->GetPacket().wdCmd, ret);
-                   }
-                   pserver->CloseClient();
-                 }
-               
+                break;
+            case -2:
+                MessageBox(NULL, _T("can not accept client,reagian!"), _T("accept client error"), MB_OK | MB_ICONERROR);
+                exit(0);
+                break;
+            default:
+                break;
             }
            
-           
-
-            
         }
     }
     else

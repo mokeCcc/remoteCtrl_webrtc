@@ -16,11 +16,23 @@ public:
 	~CCommand(){
 
 	}
+
+    int ExcuteCommand(int nCmd, std::list<CPacket>& lstPacket, const CPacket& inPacket);
+    static void RunCommand(void* arg, int status,std::list<CPacket>& lstPacket, const CPacket &inPacket) {
+        CCommand* thiz = (CCommand*)arg;
+        if (status > 0) {
+            if (thiz->ExcuteCommand(status, lstPacket,inPacket) != 0)
+                TRACE("ExcuteCommand error!\r\n");
+        }
+        else {
+            TRACE("Can not connect the client!\r\n");
+            }
+    }
 protected:
-	typedef int(CCommand::* CMDFUNC)();
+	typedef int(CCommand::* CMDFUNC)(std::list<CPacket>&,const CPacket&);
 	std::map<int, CMDFUNC> m_mapFunction;
 
-	int MakeDriverInfo() {
+	int MakeDriverInfo(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
 		std::string res;
 		for (int i = 1; i < 26; i++)
 		{
@@ -31,11 +43,12 @@ protected:
 		}
 		res += ',';
 		CPacket packet(1, (BYTE*)res.c_str(), res.size());
-		CUtils::Dump((BYTE*)packet.Data(), packet.Size());
-		CServerSocket::getInstance()->Send(packet);
+		//CUtils::Dump((BYTE*)packet.Data(), packet.Size());
+		//CServerSocket::getInstance()->Send(packet);
+        lstPackets.emplace_back(packet);
 		return 0;
 	}
-    int SendScreen() {
+    int SendScreen(std::list<CPacket>& lstPackets, const  CPacket& inPacket) {
         // TODO: multi screen 
         CImage  screen;
         HDC hScreen = GetDC(NULL);
@@ -60,20 +73,20 @@ protected:
         PBYTE pData = (PBYTE)GlobalLock(hMem);
         SIZE_T nSz = GlobalSize(hMem);
         CPacket pack(5, pData, nSz);
-        CServerSocket::getInstance()->Send(pack);
+      //  CServerSocket::getInstance()->Send(pack);
         //Dump(pData, nSz);
-
+        lstPackets.emplace_back(pack);
         GlobalUnlock(hMem);
         pStream->Release();
         ReleaseDC(NULL, hScreen);
         screen.ReleaseDC();
         return 0;
     }
-    int MakeDirectoryInfo() {
+    int MakeDirectoryInfo(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         std::string strPath;
         //  std::list<FILEINFO> lstFileInfos;
-        if (!CServerSocket::getInstance()->GetFilePath(strPath)) return -1;  //command phrase error
-
+       // if (!CServerSocket::getInstance()->GetFilePath(strPath)) return -1;  //command phrase error
+        strPath = inPacket.strData;
         if (_chdir(strPath.c_str()) != 0) {
             FILEINFO finfo;
             //finfo.IsInvalid = true;
@@ -84,7 +97,7 @@ protected:
            // TRACE("[%s] isdir: %d", finfo.szFileName, finfo.IsDirectory);
             OutputDebugString(_T("has no valid  to access the directory!"));
             CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-            CServerSocket::getInstance()->Send(pack);
+            lstPackets.emplace_back(pack);
             return -2;
         }// can not to access dir
         _finddata_t fdata;
@@ -117,29 +130,29 @@ protected:
         CServerSocket::getInstance()->Send(pack);
         return 0;
     }
-    int RunFile() {
+    int RunFile(std::list<CPacket>& lstPackets, const  CPacket& inPacket) {
         std::string strPath;
-        CServerSocket::getInstance()->GetFilePath(strPath);
+        strPath = inPacket.strData;
         ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
         CPacket pack(3, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPackets.emplace_back(pack);
         return 0;
     }
-    int DownloadFile() {
+    int DownloadFile(std::list<CPacket>& lstPackets, const  CPacket& inPacket) {
         std::string strPath;
         LONGLONG  data = 0;
-        CServerSocket::getInstance()->GetFilePath(strPath);
+        strPath = inPacket.strData;
         FILE* pFile = NULL;
         errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
         if (err != 0 || pFile == NULL) {
             CPacket pack(4, (BYTE*)&data, 8);
-            CServerSocket::getInstance()->Send(pack);
+            lstPackets.emplace_back(pack);
             return -1;
         }
         fseek(pFile, 0, SEEK_END);
         data = _ftelli64(pFile);
         CPacket head(4, (BYTE*)&data, 8);
-        CServerSocket::getInstance()->Send(head);
+        lstPackets.emplace_back(head);
         fseek(pFile, 0, SEEK_SET);
         char buffer[1024] = {};
         size_t rlen = 0;
@@ -148,28 +161,29 @@ protected:
             rlen = fread(buffer, 1, 1024, pFile);
             send_len += rlen;
             CPacket pack(4, (BYTE*)buffer, rlen);
-            CServerSocket::getInstance()->Send(pack);
+            lstPackets.emplace_back(pack);
         } while (rlen >= 1024);
         TRACE("[Send file  length : %lld, this file size : %lld] \r\n", send_len, data);
         CPacket pack(4, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPackets.emplace_back(pack);
         fclose(pFile);
         return 0;
     }
-    int LockMachine() {
+    int LockMachine(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         return 0;
     }
-    int UnlockMachine() {
+    int UnlockMachine(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         return 0;
 
     }
-    int MouseEvent() {
+    int MouseEvent(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         MOUSENV event;
         WORD nCode = 0;
-        if (CServerSocket::getInstance()->GetMouseEvent(event)) {
-            SetCursorPos(event.ptXY.x, event.ptXY.y);
-            TRACE("[Mouse Control xPos: %d yPos:%d]\r\n", event.ptXY.x, event.ptXY.y);
-            switch (event.nAction) {
+        memcpy(&event, inPacket.strData.c_str(), sizeof MOUSENV);
+       
+        SetCursorPos(event.ptXY.x, event.ptXY.y);
+        TRACE("[Mouse Control xPos: %d yPos:%d]\r\n", event.ptXY.x, event.ptXY.y);
+        switch (event.nAction) {
             case 0:  //Click
                 nCode |= 0;
                 break;
@@ -182,8 +196,8 @@ protected:
             case 4:  //move
                 nCode |= 4;
                 break;
-            }
-            switch (event.nButton) {
+         }
+        switch (event.nButton) {
             case 0:
                 nCode |= 8;
                 break;
@@ -194,7 +208,7 @@ protected:
                 nCode |= 32;
                 break;
             }
-            switch (nCode) {
+        switch (nCode) {
             case 8:
                 mouse_event(MOUSEEVENTF_LEFTDOWN, event.ptXY.x, event.ptXY.y, 0, 0);
                 break;
@@ -223,57 +237,57 @@ protected:
             default:
                 break;
             }
-        }
+        
         return 0;
     }
-    int TestConnect() {
+    int TestConnect(std::list<CPacket>& lstPackets, const  CPacket& inPacket) {
         TRACE("TestConnect send command id: 1981\r\n");
         CPacket packet(1981, NULL, 0);
-        CServerSocket::getInstance()->Send(packet);
+        lstPackets.emplace_back(packet);
         return 0;
     }
-    int DeleteFileByCommand() {
+    int DeleteFileByCommand(std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         std::string strPath;
-        CServerSocket::getInstance()->GetFilePath(strPath);
+        strPath = inPacket.strData;
         DeleteFile(strPath.c_str());
         CPacket pack(9, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPackets.emplace_back(pack);
         return 0;
     }
-    int ExcuteCommand(WORD nCmd) {
+    int ExcuteCommand(WORD nCmd, std::list<CPacket>& lstPackets, const CPacket& inPacket) {
         TRACE("ExcuteCommand!  command id: %d\r\n", nCmd);
         int ret = 0;
         switch (nCmd)
         {
         case 1:
-            ret = MakeDriverInfo();
+            ret = MakeDriverInfo(lstPackets, inPacket);
             break;
         case 2:
-            ret = MakeDirectoryInfo();
+            ret = MakeDirectoryInfo(lstPackets, inPacket);
             break;
         case 3:
-            ret = RunFile();
+            ret = RunFile(lstPackets, inPacket);
             break;
         case 4:
-            ret = DownloadFile();
+            ret = DownloadFile(lstPackets, inPacket);
             break;
         case 5:
-            ret = SendScreen();
+            ret = SendScreen(lstPackets, inPacket);
             break;
         case 6:
-            ret = LockMachine();
+            ret = LockMachine(lstPackets, inPacket);
             break;
         case 7:
-            ret = UnlockMachine();
+            ret = UnlockMachine(lstPackets, inPacket);
             break;
         case 1981:
-            ret = TestConnect();
+            ret = TestConnect(lstPackets, inPacket);
             break;
         case 8:
-            ret = DeleteFileByCommand();
+            ret = DeleteFileByCommand(lstPackets, inPacket);
             break;
         case 9:
-            ret = MouseEvent();
+            ret = MouseEvent(lstPackets, inPacket);
             break;
         }
 

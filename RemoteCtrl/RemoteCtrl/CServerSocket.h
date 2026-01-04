@@ -1,133 +1,11 @@
 #pragma once
 #include "pch.h"
-//#include "framework.h"
+#include "framework.h"
+#include "Utils.h"
+#include "Packet.h"
+#include <list>
 
-
-#pragma pack(push)
-#pragma pack(1)
-class CPacket
-{
-public:
-	CPacket() :wdHead(0), dwLength(0), wdCmd(0), wdSumCheck(0) {}
-	CPacket(WORD nCmd, const BYTE* pData, size_t  nSize) {
-		wdHead = 0xfeff;
-		dwLength = nSize + 4;
-		wdCmd = nCmd;
-		if (nSize > 0){
-			strData.resize(nSize);
-			memcpy((void*)strData.c_str(), pData, nSize);
-		}
-		else {
-			strData.clear();
-		}
-		wdSumCheck = 0;
-		for (size_t  j = 0;j<strData.size();j++){
-			wdSumCheck += (BYTE)(strData[j]) &0xff;
-		}
-	}
-	CPacket(const CPacket& pack) {
-		wdHead = pack.wdHead;
-		dwLength = pack.dwLength;
-		wdCmd = pack.wdCmd;
-		strData = pack.strData;
-		wdSumCheck = pack.wdSumCheck;
-	}
-	int Size() {
-		return dwLength + 6;
-	}
-	const char* Data() { // FF FE 09 00 00 00 01 00 43 2C 44 2C 45 24 01 
-		strOut.resize(dwLength + 6);
-		BYTE* pData = (BYTE*)strOut.c_str(); 
-		*(WORD*)pData = wdHead;				// FF FE 
-		*(DWORD*)(pData + 2) = dwLength;	// 09 00 00 00
-		*(WORD*)(pData + 6) = wdCmd;		// 01 00
-		memcpy(pData + 8, strData.c_str(), strData.size()); // 43 2C 44 2C 45
-		*(WORD*)(pData + 8 + strData.size()) = wdSumCheck; // 
-		return strOut.c_str();
-	}
-	 
-	CPacket& operator=(const CPacket& pack) {
-		if (this != &pack){
-			wdHead = pack.wdHead;
-			dwLength = pack.dwLength;
-			wdCmd = pack.wdCmd;
-			strData = pack.strData;
-			wdSumCheck = pack.wdSumCheck;
-		}
-		return *this;
-	}
-	CPacket(const BYTE* pData, size_t& nSize) {
-		size_t i;
-		for (i = 0; i < nSize; i++) { //由于使用TCP buffer 开头不一定是packet开头 所以需要去找包头
-			if (*(WORD*)(pData + i) == 0xFEFF) { 
-				wdHead = *(WORD*)(pData + i);
-				i += 2;
-				break;
-			}
-		}
-		if (i + 8 > nSize) { nSize = 0; return; }  //0x8 is dwLength AND wdHead AND wdCmd
-		dwLength = *(DWORD*)(pData + i); i += 4;
-		
-		if (dwLength + i > nSize) { // packet receive not 
-			nSize = 0;
-			return;
-		}
-		wdCmd = *(WORD*)(pData + i); i += 2;
-		if (dwLength > 4) {
-			strData.resize(dwLength - 4);
-			memcpy((void*)strData.c_str(), pData + 8, dwLength - 4);
-			i += dwLength - 4;
-		}
-		wdSumCheck = *(WORD*)(pData + i); 
-		for (unsigned int j =0; j < strData.size();j++)
-		{
-			wdSumCheck -= BYTE(strData[j]) & 0xff;
-		}
-		if (wdSumCheck == 0) {
-			nSize = i;  // length4  head 2 a and data
-			return;
-		}
-		nSize = 0;
-	}
-	~CPacket(){}
-
-	WORD wdHead;		  //fix bytes FE FF
-	DWORD dwLength;		  //packet length( packet command and data)
-	WORD  wdCmd;		  // packet command
-	std::string strData;  // packet data 
-	WORD wdSumCheck;
-	std::string strOut;
-
-
-private:
-};
-#pragma  pack (pop)
-
-typedef struct file_info {
-	file_info() {
-		IsInvalid = false;
-		IsDirectory = -1;
-		hasNext = true;
-		memset(szFileName, 0, sizeof(szFileName));
-	}
-	bool IsInvalid; // invalid
-	bool hasNext;
-	char szFileName[256]; //file name
-	bool IsDirectory;   //directory or file
-}FILEINFO, * PFILEINFO;
-
-typedef struct MouseEvent {
-	MouseEvent() {
-		nAction = 0;
-		nButton = -1;
-		ptXY.x = 0;
-		ptXY.y = 0;
-	}
-	WORD nAction; // Click(1) move(2) dounle Click(4) 
-	WORD nButton;// left(1)  right(2) mid(4)
-	POINT ptXY;
-}MOUSENV,*PMOUSENV;
-VOID Dump(BYTE* pData, unsigned int  nSize);
+typedef void(*SOCK_CALLBACK)(void*,int,std::list<CPacket>&,const CPacket&);
 class CServerSocket
 {
 public:
@@ -135,7 +13,7 @@ public:
 		if (!m_instance) { m_instance = new CServerSocket(); }
 		return m_instance;
 	}
-
+	
 	bool InitializeSocket() {
 		if (m_sock == -1) return false;
 		// TODO: check socket value
@@ -150,7 +28,28 @@ public:
 
 		return true;
 	}
-
+	int Run(SOCK_CALLBACK call_back, void* arg) {
+		m_callback = call_back;
+		m_arg = arg;
+		if (this->InitializeSocket() == false) return -1;
+		std::list<CPacket> lstPackets;
+		int count = 0;
+		while (true) {
+			if (this->AcceptClient() == false) {
+				if (count >= 3) return -2;
+				count++;
+			}
+			int ret = this->DealCommand();
+			if (ret > 0) {
+				m_callback(m_arg, ret, lstPackets,this->m_packet);
+				while (lstPackets.size() > 0) {
+					this->Send(lstPackets.front());
+					lstPackets.pop_front();
+				}
+			}
+			this->CloseClient();
+		}
+	}
 	bool AcceptClient() {
 		sockaddr_in client_addr;
 		
@@ -193,7 +92,7 @@ public:
 
 	}
 	bool Send(const char* pData, int nSize) {
-		Dump((BYTE*)pData, nSize);
+		CUtils::Dump((BYTE*)pData, nSize);
 		if (m_client == -1) return false;
 		return send(m_client, pData, nSize, 0) > 0;
 
@@ -203,29 +102,15 @@ public:
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
 
 	}
-	bool GetFilePath(std::string& strPath) {
-		if ((m_packet.wdCmd >= 2) && (m_packet.wdCmd <= 4) || m_packet.wdCmd ==8) {
-			strPath = m_packet.strData;
-			return true;
-		}
-		return false;
-	}
-	bool GetMouseEvent(MOUSENV& event) {
-		if (m_packet.wdCmd == 9) {
-			memcpy(&event, m_packet.strData.c_str(), sizeof MOUSENV);
-			return true;
-		}
-		return false;
-	}
-	CPacket& GetPacket() {
-		return m_packet;
-	}
 	void CloseClient() {
-		closesocket(m_client);
+		if(m_client != INVALID_SOCKET)
+			closesocket(m_client);
 		m_client = INVALID_SOCKET;
 	}
 private:
 	
+	SOCK_CALLBACK m_callback;
+	void* m_arg;
 	SOCKET m_sock,m_client;
 	CPacket m_packet;
 	CServerSocket& operator=(const CServerSocket&ss) {
