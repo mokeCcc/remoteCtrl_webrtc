@@ -6,7 +6,7 @@
 #include "afxdialogex.h"
 #include "RemoteDlgShow.h"
 #include "RemoteClientDlg.h"
-
+#include "ClientController.h"
 // CRemoteDlgShow dialog
 
 IMPLEMENT_DYNAMIC(CRemoteDlgShow, CDialogEx)

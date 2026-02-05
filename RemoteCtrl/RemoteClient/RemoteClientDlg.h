@@ -77,4 +77,6 @@ public:
 	afx_msg void OnFilecontrolDelete();
 	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedBtnRemote();
+	afx_msg void OnIpnFieldchangedIpaddressRemote(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditPort();
 };

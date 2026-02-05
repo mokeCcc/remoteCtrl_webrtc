@@ -33,7 +33,7 @@ public:
 	int Size() {
 		return dwLength + 6;
 	}
-	const char* Data() { // FF FE 09 00 00 00 01 00 43 2C 44 2C 45 24 01 
+	const char* Data(std::string& strOut) const{ // FF FE 09 00 00 00 01 00 43 2C 44 2C 45 24 01 
 		strOut.resize(dwLength + 6);
 		BYTE* pData = (BYTE*)strOut.c_str();
 		*(WORD*)pData = wdHead;				// FF FE 
@@ -94,7 +94,7 @@ public:
 	WORD  wdCmd;		  // packet command
 	std::string strData;  // packet data 
 	WORD wdSumCheck;
-	std::string strOut;
+	//std::string strOut;
 private:
 };
 #pragma  pack (pop)
@@ -123,7 +123,7 @@ public:
 		return m_instance;
 	}
 
-	bool InitializeSocket(int nIPAddress,int nPort) {
+	bool InitializeSocket() {
 		if (m_sock != INVALID_SOCKET) CloseServerSocket();
 		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (m_sock == -1) return false;
@@ -132,8 +132,8 @@ public:
 		sockaddr_in serv_addr;
 		memset(&serv_addr, 0, sizeof(serv_addr));
 		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_addr.s_addr = htonl(nIPAddress); 
-		serv_addr.sin_port = htons(nPort);
+		serv_addr.sin_addr.s_addr = htonl(m_nIP); 
+		serv_addr.sin_port = htons(m_nPort);
 		if (serv_addr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox("IP dont exsit!");
 			return false;
@@ -183,11 +183,13 @@ public:
 		return send(m_sock, pData, nSize, 0) > 0;
 
 	}
-	bool Send(CPacket& pack) {
+	bool Send(const CPacket& pack) {
 
 		if (m_sock == -1) return false;
-		Dump((BYTE* )pack.Data(), pack.Size());
-		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
+		std::string strOut;
+		pack.Data(strOut);
+		Dump((BYTE* )strOut.c_str(), strOut.size());
+		return send(m_sock, strOut.c_str(), strOut.size(), 0) > 0;
 
 	}
 	CPacket& GetPacket() {
@@ -200,8 +202,13 @@ public:
 		}
 		return false;
 	}
+	void UpdateAddress(int nIP, int nPort) {
+		m_nIP = nIP;
+		m_nPort = nPort;
+	}
 private:
-
+	int m_nIP;
+	int m_nPort;
 	SOCKET m_sock;
 	std::vector<char> m_buffer;
 	CPacket m_packet;
@@ -209,7 +216,12 @@ private:
 		m_sock = ss.m_sock;
 		
 	}
-	CClientSocket() {
+	CClientSocket(const CClientSocket& ss) {
+		m_sock = ss.m_sock;
+		m_nIP = ss.m_nIP;
+		m_nPort = ss.m_nPort;
+	}
+	CClientSocket():m_nIP(INADDR_ANY),m_nPort(8086) {
 		m_sock = -1;
 		if (!InitSocketEnv()) {
 			MessageBox(NULL, _T("can not initialized socket environment, please check network settings"), _T("socket initialize error!"), MB_OK | MB_ICONERROR);

@@ -8,6 +8,7 @@
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
 #include "ClientSocket.h"
+#include "ClientController.h"
 #include <thread>
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -107,10 +108,12 @@ void CRemoteClientDlg::threadDownloadFiles()
 
 		CClientSocket* pClient = CClientSocket::getInstance();
 		//int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-		int  ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);
+		//int  ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);
+		//111CClientController::getInstance().SendPakcet()
+		int ret = SendCommandPacket(4,false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
 		if (ret < 0) {
 			TRACE("sendCommand 4 ret -1");
-			pClient->CloseServerSocket();
+			CClientController::getInstance().CloseSocket(); 
 			return;
 		}
 
@@ -163,7 +166,7 @@ void CRemoteClientDlg::threadRemoteCtrl()
 
 	for (;;) {
 		if (m_isFull == false) {
-		int ret = SendMessage(WM_SEND_PACKET, 5 << 1 | 0);
+			int ret = SendCommandPacket(5);
 			if (ret == 5) {
 				BYTE* pData = (BYTE*) (pClient->GetPacket().strData.c_str());
 				IStream* pStream = SHCreateMemStream(pData, pClient->GetPacket().strData.length());
@@ -197,19 +200,23 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 int CRemoteClientDlg::SendCommandPacket(int nCmd, bool autoCloseSocket , BYTE* pData, size_t nlenghth)
 {
 	UpdateData();
-	CClientSocket* pClient = CClientSocket::getInstance();
-	bool ret = pClient->InitializeSocket(m_remote_address, atoi((LPCTSTR)m_remote_port));
-	if (!ret) {
-		AfxMessageBox("network init failed!");
-		return -1;
-	}
+	//CClientSocket* pClient = CClientSocket::getInstance();
+	//pClient->UpdateAddress(m_remote_address, atoi((LPCTSTR)m_remote_port));
+	//bool ret = pClient->InitializeSocket();
+	//if (!ret) {
+		//AfxMessageBox("network init failed!");
+		//return -1;
+	//}
+	CClientController::getInstance().UpdateAddress(m_remote_address, 
+		atoi((LPCTSTR)m_remote_port));
+
 	CPacket pack(nCmd, pData, nlenghth);
-	ret = pClient->Send(pack);
+	bool ret = CClientController::getInstance().SendPakcet(pack);
 	TRACE("Client send result:%d\r\n", ret);
-	int dwCommand = pClient->DealCommand();
+	int dwCommand = CClientController::getInstance().DealCommand();
 	TRACE("Client DealCommand:%d\r\n", dwCommand);
 	if(autoCloseSocket)
-		pClient->CloseServerSocket();
+		CClientController::getInstance().CloseSocket();
 	return dwCommand;
 }
 
@@ -226,6 +233,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_FILECONTROL_DELETE, &CRemoteClientDlg::OnFilecontrolDelete)
 	ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)
 	ON_BN_CLICKED(IDC_BTN_REMOTE, &CRemoteClientDlg::OnBnClickedBtnRemote)
+	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_REMOTE, &CRemoteClientDlg::OnIpnFieldchangedIpaddressRemote)
+	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
 END_MESSAGE_MAP()
 
 
@@ -264,6 +273,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData();
 	m_remote_address = 0x7F000001;
 	m_remote_port = _T("8086");
+	CClientController::getInstance().UpdateAddress(m_remote_address,
+		atoi((LPCTSTR)m_remote_port));
 	UpdateData(FALSE);
 	m_StatusDlg.Create(IDD_DIG_INFO, this);
 	m_StatusDlg.ShowWindow(SW_HIDE);
@@ -524,4 +535,25 @@ void CRemoteClientDlg::OnBnClickedBtnRemote()
 	
 	CRemoteDlgShow dlg(this);
 	dlg.DoModal();
+}
+
+void CRemoteClientDlg::OnIpnFieldchangedIpaddressRemote(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMIPADDRESS pIPAddr = reinterpret_cast<LPNMIPADDRESS>(pNMHDR);
+	// TODO: Add your control notification handler code here
+	*pResult = 0;
+	UpdateData();
+	CClientController::getInstance().UpdateAddress(m_remote_address, atoi((LPCTSTR)m_remote_port));
+}
+
+void CRemoteClientDlg::OnEnChangeEditPort()
+{
+	// TODO:  If this is a RICHEDIT control, the control will not
+	// send this notification unless you override the CDialogEx::OnInitDialog()
+	// function and call CRichEditCtrl().SetEventMask()
+	// with the ENM_CHANGE flag ORed into the mask.
+
+	// TODO:  Add your control notification handler code here
+	UpdateData();
+	CClientController::getInstance().UpdateAddress(m_remote_address, atoi((LPCTSTR)m_remote_port));
 }
